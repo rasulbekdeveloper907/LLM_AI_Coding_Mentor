@@ -1,24 +1,3 @@
-"""Lesson 7 - the design of our model.
-
-There is no model in this file. There is no attention, no transformer block,
-no training loop. There are only the DECISIONS, written down, plus enough
-arithmetic to find out whether those decisions are affordable.
-
-    Architecture
-          |
-    Parameter count
-          |
-    Memory requirement
-          |
-    Training feasibility
-
-That chain is the whole lesson. A model you cannot fit in your GPU is not a
-design, it is a wish - and the only way to find out before burning ten hours
-of compute is to multiply the numbers first.
-
-Lesson 8 will read this config and build the real model from it.
-"""
-
 from dataclasses import dataclass, asdict
 
 import yaml
@@ -26,34 +5,22 @@ import yaml
 
 @dataclass
 class ModelConfig:
-    """The eight numbers that define our model.
 
-    The values below are an EXAMPLE, sized for a free Colab T4. Yours should
-    come from your own dataset, your own GPU and your own patience.
-    """
-
-    # How many different tokens exist. Comes from the tokenizer, not from
-    # taste - read it out of dataset/meta.json.
     vocab_size: int = 8000
 
-    # Context length: how many tokens the model can look back at.
-    # Attention cost grows with the SQUARE of this number, so doubling it
-    # roughly quadruples the cost of the attention step.
+
     block_size: int = 256
 
-    # Embedding dimension - the "width" of the model. Every parameter count
-    # below depends on its square, so this is the most expensive dial here.
+
     n_embd: int = 384
 
-    # How many transformer blocks are stacked - the "depth" of the model.
+
     n_layer: int = 6
 
-    # Attention heads per block. n_embd must divide evenly by n_head, because
-    # the heads split the embedding between them.
+
     n_head: int = 6
 
-    # Randomly zeroes activations during training to fight overfitting.
-    # A small model on a small corpus WILL overfit, so we keep some.
+  
     dropout: float = 0.1
 
     # The feed-forward layer is this many times wider than n_embd.
@@ -64,12 +31,10 @@ class ModelConfig:
     # saves vocab_size * n_embd parameters.
     tie_weights: bool = True
 
-    def head_dim(self):
-        """Size of one attention head."""
+    def head_dim(self):        
         return self.n_embd // self.n_head
-
     def check(self):
-        """Catch the two mistakes that would break Lesson 8 on line one."""
+        
         if self.n_embd % self.n_head != 0:
             raise ValueError(
                 "n_embd ({}) must divide evenly by n_head ({})".format(
@@ -77,7 +42,7 @@ class ModelConfig:
             )
         if self.vocab_size > 65536:
             raise ValueError(
-                "vocab_size above 65536 does not fit in the uint16 token files"
+                
             )
 
     def estimate_parameters(self):

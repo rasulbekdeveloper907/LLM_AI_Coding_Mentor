@@ -1,82 +1,152 @@
-"""Stage 5 - the tokenizer.
-
-The model never sees text. It sees integers. The tokenizer is the only thing
-that knows how to go between the two:
-
-    "Once upon a time"  --encode-->  [3891, 552, 261, 1204]
-    [3891, 552, 261, 1204]  --decode-->  "Once upon a time"
-
-We use byte-level BPE from the Hugging Face `tokenizers` library. We do not
-write the BPE algorithm ourselves - that is a separate lesson, and a library
-that a thousand projects depend on has fewer bugs than our afternoon.
-
-We train on our FINAL corpus only, never on raw text. A tokenizer is a mirror
-of the text it was trained on: train it on cookie banners and it will happily
-learn a single token for "Accept all cookies".
-"""
-
 from pathlib import Path
 
-from tokenizers import Tokenizer as HFTokenizer
-from tokenizers import models, pre_tokenizers, decoders, trainers
+from tokenizers import Tokenizer
+from tokenizers.models import BPE
+from tokenizers.pre_tokenizers import ByteLevel
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
+from tokenizers.trainers import BpeTrainer
+from tokenizers.normalizers import Sequence, NFKC
 
-# <eos> marks the end of a document. It is the only special token our training
-# loop actually uses, so it is the only one we add. Unused special tokens are
-# vocabulary slots paid for and never spent.
-SPECIAL_TOKENS = ["<eos>"]
 
+class CodingTokenizer:
+    """
+    AI Coding Mentor uchun Byte-Level BPE tokenizer.
 
-class Tokenizer:
-    def __init__(self):
-        self.tokenizer = None
+    Vazifalari:
+    - coding datasetdan tokenizer o'qitish
+    - text -> token IDs
+    - token IDs -> text
+    - tokenizer.json faylini saqlash
+    """
 
-    def train(self, texts, vocab_size=8000, min_frequency=2):
-        """Learn a vocabulary from our corpus."""
-        tokenizer = HFTokenizer(models.BPE())
+    SPECIAL_TOKENS = [
+        "<pad>",
+        "<unk>",
+        "<bos>",
+        "<eos>",
+    ]
 
-        # Byte-level: the alphabet is the 256 possible bytes, so ANY text can
-        # be encoded. There is no <unk> token because there cannot be an
-        # unknown character.
-        tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
-        tokenizer.decoder = decoders.ByteLevel()
+    def __init__(self, vocab_size: int = 8000):
+        self.vocab_size = vocab_size
 
-        trainer = trainers.BpeTrainer(
-            vocab_size=vocab_size,
-            special_tokens=SPECIAL_TOKENS,
-            initial_alphabet=pre_tokenizers.ByteLevel.alphabet(),
-            # A pair seen only once is noise, not a pattern worth a token.
-            min_frequency=min_frequency,
+        self.tokenizer = Tokenizer(
+            BPE(
+                unk_token="<unk>"
+            )
+        )
+
+        # Unicode normalization
+        self.tokenizer.normalizer = Sequence([
+            NFKC()
+        ])
+
+        # Byte-Level preprocessing
+        self.tokenizer.pre_tokenizer = ByteLevel(
+            add_prefix_space=False
+        )
+
+        # Byte-Level decoding
+        self.tokenizer.decoder = ByteLevelDecoder()
+
+    def train(self, files):
+        """
+        Berilgan JSONL/text fayllardan tokenizer o'qitadi.
+        """
+
+        trainer = BpeTrainer(
+            vocab_size=self.vocab_size,
+            min_frequency=2,
+            special_tokens=self.SPECIAL_TOKENS,
             show_progress=True,
         )
 
-        tokenizer.train_from_iterator(texts, trainer=trainer)
-        self.tokenizer = tokenizer
+        self.tokenizer.train(
+            files=files,
+            trainer=trainer
+        )
 
-        print("Trained tokenizer. Vocabulary size:", self.vocab_size())
-        return self
+    def save(self, output_file):
+        """
+        Tokenizerni tokenizer.json sifatida saqlaydi.
+        """
 
-    def save(self, path):
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.tokenizer.save(str(path))
-        print("Saved tokenizer to", path)
+        output_file = Path(output_file)
+        output_file.parent.mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
-    def load(self, path):
-        self.tokenizer = HFTokenizer.from_file(str(path))
-        return self
+        self.tokenizer.save(
+            str(output_file)
+        )
 
-    def encode(self, text):
-        """text -> list of token IDs"""
-        return self.tokenizer.encode(text).ids
+    def encode(self, text: str):
+        """
+        Text -> token IDs
+        """
 
-    def decode(self, ids):
-        """list of token IDs -> text"""
-        return self.tokenizer.decode(ids)
+        encoded = self.tokenizer.encode(text)
 
-    def vocab_size(self):
+        return encoded.ids
+
+    def decode(self, token_ids):
+        """
+        Token IDs -> text
+        """
+
+        return self.tokenizer.decode(
+            token_ids
+        )
+
+    def encode_with_tokens(self, text: str):
+        """
+        Text -> token IDs + tokenlar
+        """
+
+        encoded = self.tokenizer.encode(text)
+
+        return {
+            "ids": encoded.ids,
+            "tokens": encoded.tokens
+        }
+
+    def token_to_id(self, token: str):
+        """
+        Token -> ID
+        """
+
+        return self.tokenizer.token_to_id(token)
+
+    def id_to_token(self, token_id: int):
+        """
+        ID -> Token
+        """
+
+        return self.tokenizer.id_to_token(
+            token_id
+        )
+
+    def get_vocab_size(self):
+        """
+        Vocabulary size.
+        """
+
         return self.tokenizer.get_vocab_size()
 
-    def eos_id(self):
-        """The ID of <eos>. The dataset builder needs it to mark document
-        boundaries."""
-        return self.tokenizer.token_to_id("<eos>")
+    def load(self, tokenizer_file):
+        """
+        Mavjud tokenizer.json ni yuklaydi.
+        """
+
+        tokenizer_file = Path(
+            tokenizer_file
+        )
+
+        if not tokenizer_file.exists():
+            raise FileNotFoundError(
+                f"Tokenizer not found:\n{tokenizer_file}"
+            )
+
+        self.tokenizer = Tokenizer.from_file(
+            str(tokenizer_file)
+        )
