@@ -1,21 +1,102 @@
-"""Step 1: download the raw corpus.
-
-    python scripts/download_data.py
-"""
-
-import sys
 from pathlib import Path
+import json
 
-# Let Python find the src/ folder when this script is run from the repo root.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from datasets import load_dataset
 
-from src.data_downloader import DataDownloader
 
-# Change this to download more or fewer stories. None = the whole dataset
-# (over 2 million documents - slow, only do it when you mean it).
-MAX_DOCUMENTS = 50000
+# ============================================================
+# PROJECT PATHS
+# ============================================================
 
-OUTPUT = Path("data/raw/tinystories.jsonl")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-downloader = DataDownloader(dataset_name="roneneldan/TinyStories", split="train")
-downloader.run(OUTPUT, max_documents=MAX_DOCUMENTS)
+RAW_DIR = PROJECT_ROOT / "data" / "raw"
+CLEANED_DIR = PROJECT_ROOT / "data" / "cleaned"
+FILTERED_DIR = PROJECT_ROOT / "data" / "filtered"
+FINAL_DIR = PROJECT_ROOT / "data" / "final"
+
+
+# ============================================================
+# DATASET CONFIG
+# ============================================================
+
+DATASET_NAME = "ise-uiuc/Magicoder-Evol-Instruct-110K"
+SPLIT = "train"
+
+RAW_FILE = RAW_DIR / "magicoder_evol_instruct_110k.jsonl"
+
+
+# ============================================================
+# CREATE DIRECTORIES
+# ============================================================
+
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+CLEANED_DIR.mkdir(parents=True, exist_ok=True)
+FILTERED_DIR.mkdir(parents=True, exist_ok=True)
+FINAL_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ============================================================
+# DOWNLOAD DATASET
+# ============================================================
+
+def download_dataset():
+
+    print("=" * 60)
+    print("AI CODING MENTOR - DATASET DOWNLOAD")
+    print("=" * 60)
+
+    print(f"\nDataset: {DATASET_NAME}")
+    print(f"Split:   {SPLIT}")
+
+    print("\n[1/3] Loading dataset from Hugging Face...")
+
+    dataset = load_dataset(
+        DATASET_NAME,
+        split=SPLIT
+    )
+
+    print("Dataset loaded successfully!")
+    print(f"Number of records: {len(dataset)}")
+
+    print("\n[2/3] Dataset columns:")
+    print(dataset.column_names)
+
+    print("\n[3/3] Saving dataset to:")
+    print(RAW_FILE)
+
+    with open(
+        RAW_FILE,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        for item in dataset:
+
+            record = {
+                "instruction": item.get("instruction", ""),
+                "response": item.get("response", "")
+            }
+
+            f.write(
+                json.dumps(
+                    record,
+                    ensure_ascii=False
+                ) + "\n"
+            )
+
+    print("\n" + "=" * 60)
+    print("DOWNLOAD COMPLETED")
+    print("=" * 60)
+
+    print(f"\nSaved records : {len(dataset):,}")
+    print(f"Output file   : {RAW_FILE}")
+    print(f"File exists   : {RAW_FILE.exists()}")
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+if __name__ == "__main__":
+    download_dataset()
