@@ -1,32 +1,42 @@
-"""Lesson 8, Part 2 - the feed-forward network (FFN).
-
-Attention lets tokens exchange information with each other. The feed-forward
-network is where the model actually processes what it just gathered - it
-runs on each position independently, with no mixing between positions at all.
-"""
-
+import torch
 import torch.nn as nn
 
 
-class FeedForward(nn.Module):
-    """Two linear layers with a GELU activation in between.
+class MLP(nn.Module):
+    """Feed-Forward Network used inside a Transformer block.
 
-    n_embd -> ffn_mult * n_embd -> n_embd. The hidden layer is wider than the
-    input so the network has room to combine features before shrinking back
-    down to n_embd for the next block.
+    Input:
+        (batch, time, n_embd)
+
+    Output:
+        (batch, time, n_embd)
     """
 
     def __init__(self, config):
         super().__init__()
-        hidden = config.ffn_mult * config.n_embd
 
-        self.fc_in = nn.Linear(config.n_embd, hidden)
-        self.activation = nn.GELU()
-        self.fc_out = nn.Linear(hidden, config.n_embd)
+        # Transformer FFN expands the embedding dimension.
+        # Example:
+        # n_embd = 384
+        # ffn_mult = 4
+        # hidden_dim = 1536
+        hidden_dim = config.n_embd * config.ffn_mult
+
+        self.fc1 = nn.Linear(config.n_embd, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, config.n_embd)
+
         self.dropout = nn.Dropout(config.dropout)
 
     def forward(self, x):
-        x = self.fc_in(x)
-        x = self.activation(x)
-        x = self.fc_out(x)
+        # Expand:
+        # (B, T, C) -> (B, T, hidden_dim)
+        x = self.fc1(x)
+
+        # Non-linear activation.
+        x = torch.nn.functional.gelu(x)
+
+        # Project back:
+        # (B, T, hidden_dim) -> (B, T, C)
+        x = self.fc2(x)
+
         return self.dropout(x)
