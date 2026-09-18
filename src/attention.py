@@ -1,12 +1,3 @@
-"""Lesson 8, Part 1 - causal self-attention.
-
-Attention lets every token look back at every earlier token and decide, by
-itself, which ones matter for predicting the next one. "Causal" means it can
-only look backward, never forward - a token must never see the answer before
-it predicts it. That one rule is what the causality test at the end of this
-lesson exists to prove.
-"""
-
 import math
 
 import torch
